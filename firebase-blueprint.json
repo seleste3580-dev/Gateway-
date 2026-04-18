@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information tracking their interactions and preferences.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Session": {
+      "title": "AI Session",
+      "description": "A container for a set of AI interactions, either a comparison or a pipeline.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["comparison", "pipeline"] },
+        "config": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "type", "createdAt"]
+    },
+    "Execution": {
+      "title": "AI Execution",
+      "description": "A single call to an AI model within a session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "prompt": { "type": "string" },
+        "model": { "type": "string" },
+        "provider": { "type": "string" },
+        "response": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "error"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "sessionId", "userId", "prompt", "model", "status", "timestamp"]
+    },
+    "ApiKey": {
+      "title": "Forge API Key",
+      "description": "Custom API keys for programmatic access to the gateway.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "key": { "type": "string" },
+        "name": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastUsed": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "revoked"] }
+      },
+      "required": ["id", "key", "userId", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profiles."
+    },
+    "/apiKeys/{keyId}": {
+      "schema": "ApiKey",
+      "description": "User generated API keys for the platform."
+    },
+    "/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "User created AI sessions (comparisons/pipelines)."
+    },
+    "/sessions/{sessionId}/executions/{executionId}": {
+      "schema": "Execution",
+      "description": "Individual model responses within a session."
+    }
+  }
+}

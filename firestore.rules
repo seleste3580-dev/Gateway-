@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Users ---
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) 
+        && incoming().uid == userId
+        && incoming().email is string
+        && incoming().createdAt == request.time;
+      allow update: if isOwner(userId)
+        && incoming().uid == userId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL']);
+    }
+
+    // --- Sessions ---
+    match /sessions/{sessionId} {
+      allow get: if isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn()
+        && incoming().userId == request.auth.uid
+        && incoming().id == sessionId
+        && isValidId(sessionId)
+        && incoming().createdAt == request.time;
+        
+      allow update: if isOwner(existing().userId)
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'config']);
+        
+      allow delete: if isOwner(existing().userId);
+
+      // --- Executions ---
+      match /executions/{executionId} {
+        allow get, list: if isOwner(get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId);
+        
+        allow create: if isSignedIn()
+          && isOwner(get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId)
+          && incoming().userId == request.auth.uid
+          && incoming().sessionId == sessionId
+          && incoming().id == executionId
+          && isValidId(executionId)
+          && incoming().timestamp == request.time;
+          
+        allow update: if isOwner(existing().userId)
+          && incoming().userId == existing().userId
+          && incoming().sessionId == sessionId
+          && incoming().id == executionId
+          && incoming().diff(existing()).affectedKeys().hasOnly(['response', 'status', 'metadata']);
+          
+        allow delete: if isOwner(existing().userId);
+      }
+    }
+
+    // --- API Keys ---
+    match /apiKeys/{keyId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner(existing().userId);
+      allow create: if isSignedIn() 
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().status == "active";
+      allow update: if isOwner(existing().userId)
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lastUsed', 'name']);
+      allow delete: if isOwner(existing().userId);
+    }
+  }
+}
